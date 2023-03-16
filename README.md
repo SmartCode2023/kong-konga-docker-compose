@@ -1,4 +1,5 @@
 # kong-konga-docker-compose
+Link for the configuration steps: https://refactorizando.com/arquitectura-microservicios-kong-konga/
 
 Use the latest version of kong and konga, and do not need to compile, directly pull the official image to run.
 
