@@ -2,30 +2,35 @@ version: '3'
 
 services:
 
-  kong-database:
-    image: postgres:9.6
-    container_name: kong-database
-    ports:
-      - 5432:5432
-    environment:
-      - POSTGRES_USER=kong
-      - POSTGRES_DB=kong
-      - POSTGRES_PASSWORD=kong
+  kong-db:
+    image: postgres:11-alpine
     volumes:
-      - "db-data-kong-postgres:/var/lib/postgresql/data"
+      - db-data-kong-postgres:/var/lib/postgresql/data
+    networks:
+      - kong-net
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
 
-  kong-migrations:
+  kong-migration:
     image: kong
+    depends_on:
+      - kong-db
+    container_name: kong-migration
+    networks:
+      - kong-net
+    restart: on-failure
     environment:
       - KONG_DATABASE=postgres
-      - KONG_PG_HOST=kong-database
+      - KONG_PG_HOST=kong-db
+      - KONG_PG_DATABASE=postgres
+      - KONG_PG_USER=kong
       - KONG_PG_PASSWORD=kong
-      - KONG_CASSANDRA_CONTACT_POINTS=kong-database
     command: kong migrations bootstrap
-    restart: on-failure
-    depends_on:
-      - kong-database
-
+    
   kong:
     image: kong
     container_name: kong
@@ -33,10 +38,11 @@ services:
       - LC_CTYPE=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
       - KONG_DATABASE=postgres
-      - KONG_PG_HOST=kong-database
+      - KONG_PG_DATABASE=postgres
+      - KONG_PG_HOST=kong-db
       - KONG_PG_USER=kong
       - KONG_PG_PASSWORD=kong
-      - KONG_CASSANDRA_CONTACT_POINTS=kong-database
+      - KONG_CASSANDRA_CONTACT_POINTS=kong-db
       - KONG_PROXY_ACCESS_LOG=/dev/stdout
       - KONG_ADMIN_ACCESS_LOG=/dev/stdout
       - KONG_PROXY_ERROR_LOG=/dev/stderr
@@ -49,9 +55,12 @@ services:
       - 8001:8001
       - 8444:8444
     links:
-      - kong-database:kong-database
+      - kong-db:kong-db
+    networks:
+      - kong-net
     depends_on:
-      - kong-migrations
+      - kong-migration
+      - kong-db
 
   konga:
     image: pantsel/konga
@@ -60,6 +69,8 @@ services:
     links:
       - kong:kong
     container_name: konga
+    networks:
+      - kong-net
     environment:
       - NODE_ENV=production
 
@@ -67,7 +78,5 @@ volumes:
   db-data-kong-postgres:
 
 networks:
-    default:
-        external:
-            name: kong-net
-
+  kong-net:
+    external: false
